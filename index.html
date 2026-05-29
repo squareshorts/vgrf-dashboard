@@ -36,9 +36,13 @@
                     <label for="data-source">Source Type:</label>
                     <select id="data-source">
                         <option value="simulator" selected>Synthetic Simulator</option>
+                        <option value="bluetooth">Bluetooth BLE (IMU)</option>
                         <option value="serial">Web Serial (USB/COM)</option>
                         <option value="websocket">WebSocket Stream (Port 8765)</option>
                     </select>
+                </div>
+                <div class="control-group" id="ble-settings" style="display: none;">
+                    <button id="btn-connect-ble" class="btn-primary">Connect Bluetooth BLE</button>
                 </div>
                 <div class="control-group" id="serial-settings" style="display: none;">
                     <button id="btn-connect-serial" class="btn-primary">Connect USB Sensor</button>

@@ -47,11 +47,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle Data Source Changes
     const sourceSelect = document.getElementById('data-source');
+    const bleSettings = document.getElementById('ble-settings');
     const serialSettings = document.getElementById('serial-settings');
     const wsSettings = document.getElementById('ws-settings');
     const wsStatus = document.getElementById('ws-status');
+    const btnConnectBle = document.getElementById('btn-connect-ble');
     const btnConnectSerial = document.getElementById('btn-connect-serial');
     const statusText = document.querySelector('.status-text');
+
+    // BLE connection state variables
+    let bleDevice = null;
+    let bleCharacteristic = null;
+    let isBleConnecting = false;
 
     sourceSelect.addEventListener('change', async (e) => {
         const source = e.target.value;
@@ -60,8 +67,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Reset previous connections
         stopWebSocket();
         await stopSerial();
+        await stopBle();
 
         // Show/hide relevant settings
+        bleSettings.style.display = (source === 'bluetooth') ? 'block' : 'none';
         serialSettings.style.display = (source === 'serial') ? 'block' : 'none';
         wsSettings.style.display = (source === 'websocket') ? 'block' : 'none';
 
@@ -74,8 +83,158 @@ document.addEventListener('DOMContentLoaded', () => {
             startWebSocket();
         } else if (source === 'serial') {
             statusText.innerText = "Ready to connect USB/Serial Sensor";
+        } else if (source === 'bluetooth') {
+            statusText.innerText = "Ready to connect Bluetooth BLE Sensor";
         }
     });
+
+    // --- Shared Text Stream Processor ---
+    let streamBuffer = "";
+    function processIncomingText(text, source) {
+        if (activeSource !== source) return;
+
+        streamBuffer += text;
+        const lines = streamBuffer.split("\n");
+        streamBuffer = lines.pop(); // Keep incomplete line in buffer
+
+        const samples = [];
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            
+            try {
+                let parsedData;
+                if (trimmed.startsWith("{")) {
+                    parsedData = JSON.parse(trimmed);
+                } else {
+                    // Assume CSV: ref,raw,adapted OR raw_value
+                    const parts = trimmed.split(",").map(Number);
+                    if (parts.length >= 3) {
+                        parsedData = { reference: parts[0], raw: parts[1], adapted: parts[2] };
+                    } else if (parts.length >= 1) {
+                        parsedData = { raw: parts[0] };
+                    }
+                }
+                if (parsedData) {
+                    samples.push(parseSensorPayload(parsedData));
+                }
+            } catch (e) {
+                console.warn(`Skipping malformed ${source} line:`, trimmed);
+            }
+        }
+
+        if (samples.length > 0) {
+            chartManager.updateData(samples);
+        }
+    }
+
+    // --- Web Bluetooth BLE Stream ---
+    btnConnectBle.addEventListener('click', async () => {
+        if (bleDevice && bleDevice.gatt.connected) {
+            await stopBle();
+            return;
+        }
+
+        try {
+            isBleConnecting = true;
+            btnConnectBle.innerText = "Connecting...";
+            btnConnectBle.disabled = true;
+            statusText.innerText = "Scanning for Bluetooth BLE devices...";
+
+            // Common transparent serial UART UUIDs (Nordic NUS, HM-10, ESP32 custom BLE)
+            const serviceUUIDs = [
+                '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART Service
+                'ffe0',                                 // HM-10 / CC2541 Serial
+                '19b10000-e8f2-537e-4f6c-d104768a1214'  // Custom Arduino BLE
+            ];
+
+            bleDevice = await navigator.bluetooth.requestDevice({
+                filters: [
+                    { namePrefix: 'IMU' },
+                    { namePrefix: 'BLE' },
+                    { namePrefix: 'vGRF' },
+                    { namePrefix: 'Arduino' },
+                    { namePrefix: 'ESP32' }
+                ],
+                optionalServices: serviceUUIDs
+            });
+
+            statusText.innerText = `Connecting to ${bleDevice.name}...`;
+
+            const server = await bleDevice.gatt.connect();
+            
+            // Discover active service and characteristic
+            let rxChar = null;
+            for (const uuid of serviceUUIDs) {
+                try {
+                    const service = await server.getPrimaryService(uuid);
+                    const characteristics = await service.getCharacteristics();
+                    
+                    // Look for characteristic that supports notify
+                    rxChar = characteristics.find(c => c.properties.notify);
+                    if (rxChar) break;
+                } catch (e) {
+                    // Try next UUID if this service isn't exposed by device
+                }
+            }
+
+            if (!rxChar) {
+                throw new Error("Could not find a notifying UART RX characteristic on the BLE device.");
+            }
+
+            bleCharacteristic = rxChar;
+            await bleCharacteristic.startNotifications();
+            bleCharacteristic.addEventListener('characteristicvaluechanged', handleBleNotification);
+
+            // Update UI State
+            btnConnectBle.innerText = "Disconnect BLE";
+            btnConnectBle.disabled = false;
+            btnConnectBle.style.background = "linear-gradient(135deg, #f43f5e, #e11d48)";
+            statusText.innerText = `Streaming via Bluetooth BLE: ${bleDevice.name}`;
+            
+            bleDevice.addEventListener('gattserverdisconnected', async () => {
+                await stopBle();
+                statusText.innerText = "Bluetooth BLE Disconnected (Link Loss)";
+            });
+
+        } catch (err) {
+            console.error("BLE Connection failed:", err);
+            alert("Bluetooth connection failed: " + err.message);
+            await stopBle();
+        } finally {
+            isBleConnecting = false;
+        }
+    });
+
+    function handleBleNotification(event) {
+        if (activeSource !== 'bluetooth') return;
+        const value = event.target.value;
+        const decoder = new TextDecoder('utf-8');
+        const text = decoder.decode(value);
+        processIncomingText(text, 'bluetooth');
+    }
+
+    async function stopBle() {
+        btnConnectBle.innerText = "Connect Bluetooth BLE";
+        btnConnectBle.disabled = false;
+        btnConnectBle.style.background = "";
+        
+        if (bleCharacteristic) {
+            try {
+                await bleCharacteristic.stopNotifications();
+                bleCharacteristic.removeEventListener('characteristicvaluechanged', handleBleNotification);
+            } catch (e) {}
+            bleCharacteristic = null;
+        }
+
+        if (bleDevice && bleDevice.gatt.connected) {
+            bleDevice.gatt.disconnect();
+        }
+        bleDevice = null;
+        if (activeSource === 'bluetooth') {
+            statusText.innerText = "Bluetooth BLE Sensor Disconnected";
+        }
+    }
 
     // --- WebSocket Stream ---
     function startWebSocket() {
@@ -151,44 +310,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const readableStreamClosed = serialPort.readable.pipeTo(textDecoder.writable);
         serialReader = textDecoder.readable.getReader();
 
-        let buffer = "";
-
         try {
             while (isSerialReading) {
                 const { value, done } = await serialReader.read();
                 if (done) break;
-                
-                buffer += value;
-                const lines = buffer.split("\n");
-                buffer = lines.pop(); // Keep incomplete line in buffer
-
-                const samples = [];
-                for (const line of lines) {
-                    const trimmed = line.trim();
-                    if (!trimmed) continue;
-                    
-                    try {
-                        let parsedData;
-                        if (trimmed.startsWith("{")) {
-                            parsedData = JSON.parse(trimmed);
-                        } else {
-                            // Assume CSV: ref,raw,adapted OR raw_value
-                            const parts = trimmed.split(",").map(Number);
-                            if (parts.length >= 3) {
-                                parsedData = { reference: parts[0], raw: parts[1], adapted: parts[2] };
-                            } else {
-                                parsedData = { raw: parts[0] };
-                            }
-                        }
-                        samples.push(parseSensorPayload(parsedData));
-                    } catch (e) {
-                        console.warn("Skipping malformed line:", trimmed);
-                    }
-                }
-
-                if (samples.length > 0 && activeSource === 'serial') {
-                    chartManager.updateData(samples);
-                }
+                processIncomingText(value, 'serial');
             }
         } catch (err) {
             console.error("Serial read error:", err);
