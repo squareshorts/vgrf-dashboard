@@ -14,6 +14,8 @@ class UIManager {
         this.rawRmseEl = document.getElementById('val-raw-rmse');
         this.adaptRmseEl = document.getElementById('val-adapt-rmse');
         this.biasEl = document.getElementById('val-bias');
+        
+        this.metricsInterval = null;
 
         this.initEventListeners();
         this.updateMetricsDisplay();
@@ -66,8 +68,13 @@ class UIManager {
             }
         }
 
+        // Clear previous interval if any
+        if (this.metricsInterval) {
+            clearInterval(this.metricsInterval);
+        }
+
         // Add small random noise to simulate "live" metric fluctuation
-        setInterval(() => {
+        this.metricsInterval = setInterval(() => {
             const noise = () => (Math.random() - 0.5) * 1.5;
             this.rawRmseEl.innerText = (raw + noise()).toFixed(1) + ' N';
             this.adaptRmseEl.innerText = (adapt + noise()).toFixed(1) + ' N';

@@ -47,7 +47,8 @@ class ChartManager {
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: false, // Turn off for performance on fast updates
-                parsing: false, // Optimize for raw data
+                normalized: true,
+                parsing: true, // Enable parsing for standard arrays
                 interaction: {
                     mode: 'nearest',
                     axis: 'x',
