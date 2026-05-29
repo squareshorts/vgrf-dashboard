@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vGRF Live Diagnostics - Practitioner Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar / Navigation -->
+        <aside class="sidebar glass-panel">
+            <div class="logo">
+                <div class="icon"></div>
+                <h2>vGRF<br><span>Live Diagnostics</span></h2>
+            </div>
+            
+            <div class="patient-card">
+                <h3>Current Patient</h3>
+                <div class="patient-info">
+                    <p><strong>ID:</strong> P08 (Held-out)</p>
+                    <p><strong>Age:</strong> 28</p>
+                    <p><strong>Condition:</strong> Healthy Adult</p>
+                    <p><strong>Status:</strong> Active Walking</p>
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <h3>Adaptation Settings</h3>
+                <div class="control-group">
+                    <label for="calibration-budget">Calibration Steps:</label>
+                    <select id="calibration-budget">
+                        <option value="5">5 Steps</option>
+                        <option value="10">10 Steps</option>
+                        <option value="20" selected>20 Steps</option>
+                        <option value="50">50 Steps</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="global-backbone">Global Backbone:</label>
+                    <select id="global-backbone">
+                        <option value="rf">Random Forest</option>
+                        <option value="gru">GRU</option>
+                        <option value="itransformer">iTransformer</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="metrics-summary">
+                <h3>Live Metrics</h3>
+                <div class="metric-box warning">
+                    <span class="metric-label">Peak RMSE (Raw Global)</span>
+                    <span class="metric-value" id="val-raw-rmse">177.8 N</span>
+                </div>
+                <div class="metric-box success">
+                    <span class="metric-label">Peak RMSE (Adapted)</span>
+                    <span class="metric-value" id="val-adapt-rmse">58.1 N</span>
+                </div>
+                <div class="metric-box info">
+                    <span class="metric-label">Peak Bias (Adapted)</span>
+                    <span class="metric-value" id="val-bias">-2.4 N</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-header glass-panel">
+                <div class="header-title">
+                    <h1>Real-Time vGRF Monitoring</h1>
+                    <p>Calibration-Light Subject Adaptation in Single-Sensor Estimation</p>
+                </div>
+                <div class="status-indicator">
+                    <span class="dot pulse"></span>
+                    <span class="status-text">Receiving Sensor Data (100 Hz)</span>
+                </div>
+            </header>
+
+            <section class="charts-container">
+                <div class="chart-wrapper glass-panel">
+                    <div class="chart-header">
+                        <h2>Vertical Ground Reaction Force (vGRF) Trajectory</h2>
+                        <div class="legend-custom">
+                            <span class="legend-item"><span class="color-box ref"></span> Reference (Force Plate)</span>
+                            <span class="legend-item"><span class="color-box raw"></span> Raw Global Model</span>
+                            <span class="legend-item"><span class="color-box adapt"></span> Adapted Model</span>
+                        </div>
+                    </div>
+                    <div class="canvas-container">
+                        <canvas id="vgrfChart"></canvas>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- App Scripts -->
+    <script src="simulator.js"></script>
+    <script src="chartManager.js"></script>
+    <script src="ui.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

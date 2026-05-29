@@ -1,0 +1,289 @@
+:root {
+    --bg-color: #0b0f19;
+    --bg-gradient: radial-gradient(circle at 15% 50%, rgba(32, 45, 75, 0.4), transparent 50%),
+                   radial-gradient(circle at 85% 30%, rgba(18, 55, 60, 0.4), transparent 50%);
+    --glass-bg: rgba(255, 255, 255, 0.03);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --text-primary: #f0f4f8;
+    --text-secondary: #94a3b8;
+    
+    /* Chart Colors */
+    --color-ref: #ffffff; /* White for Ground Truth */
+    --color-raw: #f43f5e; /* Rose for Raw */
+    --color-adapt: #10b981; /* Emerald for Adapted */
+
+    /* UI Colors */
+    --accent-blue: #3b82f6;
+    --success-bg: rgba(16, 185, 129, 0.1);
+    --success-border: rgba(16, 185, 129, 0.3);
+    --warning-bg: rgba(244, 63, 94, 0.1);
+    --warning-border: rgba(244, 63, 94, 0.3);
+    --info-bg: rgba(59, 130, 246, 0.1);
+    --info-border: rgba(59, 130, 246, 0.3);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    background-image: var(--bg-gradient);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.dashboard-container {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    width: 100%;
+    max-width: 1600px;
+    height: 100vh;
+    padding: 24px;
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* Sidebar */
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    gap: 32px;
+    overflow-y: auto;
+}
+
+.logo h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    background: linear-gradient(90deg, #60a5fa, #34d399);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.logo h2 span {
+    font-size: 1rem;
+    font-weight: 300;
+    color: var(--text-secondary);
+    -webkit-text-fill-color: var(--text-secondary);
+}
+
+h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+/* Patient Card */
+.patient-info p {
+    font-size: 0.95rem;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+.patient-info p strong {
+    color: var(--text-secondary);
+    margin-right: 8px;
+}
+
+/* Controls */
+.control-group {
+    margin-bottom: 16px;
+}
+.control-group label {
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+}
+select {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--glass-border);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    outline: none;
+    transition: all 0.3s ease;
+    appearance: none;
+    cursor: pointer;
+}
+select:focus {
+    border-color: var(--accent-blue);
+    background: rgba(0, 0, 0, 0.4);
+}
+select option {
+    background: var(--bg-color);
+}
+
+/* Metrics */
+.metrics-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.metric-box {
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid transparent;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: transform 0.2s ease;
+}
+.metric-box:hover {
+    transform: translateY(-2px);
+}
+.metric-box.warning {
+    background: var(--warning-bg);
+    border-color: var(--warning-border);
+}
+.metric-box.success {
+    background: var(--success-bg);
+    border-color: var(--success-border);
+}
+.metric-box.info {
+    background: var(--info-bg);
+    border-color: var(--info-border);
+}
+.metric-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+.metric-box.warning .metric-label { color: #fda4af; }
+.metric-box.success .metric-label { color: #6ee7b7; }
+.metric-box.info .metric-label { color: #93c5fd; }
+
+.metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+/* Main Content */
+.main-content {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Header */
+.top-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 32px;
+}
+.header-title h1 {
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+.header-title p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(0,0,0,0.3);
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--glass-border);
+}
+.dot {
+    width: 10px;
+    height: 10px;
+    background-color: var(--color-adapt);
+    border-radius: 50%;
+}
+.pulse {
+    animation: pulse-animation 2s infinite;
+}
+@keyframes pulse-animation {
+    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+.status-text {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+/* Chart Container */
+.charts-container {
+    flex-grow: 1;
+    display: flex;
+}
+.chart-wrapper {
+    width: 100%;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+}
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.chart-header h2 {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+.legend-custom {
+    display: flex;
+    gap: 20px;
+}
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+.color-box {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+}
+.color-box.ref { background: var(--color-ref); }
+.color-box.raw { background: var(--color-raw); }
+.color-box.adapt { background: var(--color-adapt); }
+
+.canvas-container {
+    flex-grow: 1;
+    position: relative;
+    width: 100%;
+    min-height: 400px;
+}
+
+@media (max-width: 1024px) {
+    .dashboard-container {
+        grid-template-columns: 1fr;
+        height: auto;
+    }
+    .sidebar {
+        order: 2;
+    }
+}
