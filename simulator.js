@@ -1,111 +1,164 @@
 /**
  * simulator.js
- * Generates synthetic vGRF data mimicking human walking at 100 Hz.
- * Creates an M-shaped curve for stance phase and zero for swing phase.
+ * Generates synthetic MPU-6050 raw IMU signals (ax,ay,az in g; gx,gy,gz in deg/s)
+ * that mimic normal human walking at 100 Hz, PLUS separate reference GRF values
+ * that represent the "force plate ground truth" for demonstration purposes.
+ *
+ * The raw IMU signals pass through ImuProcessor (dsp.js) to produce estimated
+ * force components, demonstrating how the pipeline works end-to-end.
  */
-
 class VGRFSimulator {
     constructor() {
-        this.sampleRate = 100; // 100 Hz as per manuscript
-        this.t = 0;
-        this.stanceDuration = 60; // 600ms stance
-        this.swingDuration = 40;  // 400ms swing
-        this.cycleLength = this.stanceDuration + this.swingDuration;
-        this.currentStep = 0;
-        
-        // Base errors for 20-step budget (default)
+        this.sampleRate    = 100;  // Hz
+        this.stanceSamples = 60;   // 600 ms stance
+        this.swingSamples  = 40;   // 400 ms swing
+        this.cycleLen      = 100;  // total gait cycle
+        this.t             = 0;
+        this.massKg        = 70.0; // updated from patient form
+
         this.setBudget(20);
     }
 
-    setBudget(budgetSteps) {
-        // According to the manuscript, Random Forest RMSE is roughly:
-        // Raw: ~178N
-        // Adapted 5 steps: ~62N
-        // Adapted 10 steps: ~68N
-        // Adapted 20 steps: ~58N
-        // Adapted 50 steps: ~46N
-        this.budget = parseInt(budgetSteps);
-        
-        // Raw model systematically misses the peak (underestimates loading)
-        this.rawPeakError = 175; 
-        
-        // Adapted model error varies by budget
-        switch(this.budget) {
-            case 5: this.adaptPeakError = 62; break;
-            case 10: this.adaptPeakError = 68; break;
-            case 20: this.adaptPeakError = 58; break;
-            case 50: this.adaptPeakError = 46; break;
-            default: this.adaptPeakError = 58;
-        }
+    setMass(kg) {
+        this.massKg = Math.max(1, parseFloat(kg) || 70.0);
     }
 
-    // Mathematical approximation of the "M" shape vGRF
-    generateStanceCurve(progress) {
-        // progress is 0 to 1
-        // Peak 1 (Heel Strike) ~ 1.1 - 1.2 BW (say 800N)
-        // Valley (Mid Stance) ~ 0.7 - 0.8 BW (say 550N)
-        // Peak 2 (Toe Off) ~ 1.1 - 1.2 BW (say 850N)
-        
-        const peak1 = 800;
-        const valley = 550;
-        const peak2 = 850;
-        
-        // Using a combination of sines to create the shape
-        // It's a crude but visually effective mock
-        const p1 = Math.sin(progress * Math.PI) * peak1 * Math.exp(-Math.pow(progress - 0.2, 2) * 20);
-        const p2 = Math.sin(progress * Math.PI) * peak2 * Math.exp(-Math.pow(progress - 0.8, 2) * 20);
-        const mid = Math.sin(progress * Math.PI) * valley * Math.exp(-Math.pow(progress - 0.5, 2) * 10);
-        
+    setBudget(steps) {
+        this.budget = parseInt(steps);
+    }
+
+    /* ── Reference force waveforms (simulated force-plate ground truth) ── */
+
+    /** Vertical GRF — classic double-peaked M-shape during stance. */
+    _refFz(progress) {
+        const m = this.massKg;
+        const peak1 = m * 11.43;   // ~1.17 BW peak
+        const valley = m * 7.86;   // ~0.80 BW mid-stance dip
+        const peak2  = m * 12.14;  // ~1.24 BW push-off peak
+        const p1 = Math.sin(progress * Math.PI) * peak1
+                   * Math.exp(-Math.pow(progress - 0.20, 2) * 20);
+        const p2 = Math.sin(progress * Math.PI) * peak2
+                   * Math.exp(-Math.pow(progress - 0.80, 2) * 20);
+        const mid = Math.sin(progress * Math.PI) * valley
+                    * Math.exp(-Math.pow(progress - 0.50, 2) * 10);
         return Math.max(0, p1 + p2 + mid);
     }
 
+    /** Anterior-posterior GRF — braking then propulsion. */
+    _refFy(progress) {
+        const m = this.massKg;
+        const amp = m * 2.14;   // ~0.22 BW amplitude
+        // Negative in first half (braking), positive in second (propulsion)
+        return -amp * Math.sin(progress * Math.PI) * Math.cos(progress * Math.PI);
+    }
+
+    /** Medio-lateral GRF — small lateral sway. */
+    _refFx(progress) {
+        const m = this.massKg;
+        const amp = m * 0.71;   // ~0.07 BW amplitude
+        return amp * Math.sin(2 * progress * Math.PI);
+    }
+
+    /* ── Reverse-engineer IMU signals from reference forces ─────────────── */
+
+    /**
+     * Convert target force components to what the MPU-6050 would sense,
+     * adding realistic sensor noise, angular motion and gravity projection.
+     */
+    _forceToImu(fz_ref, fy_ref, fx_ref, progress, cycleProgress) {
+        const G = 9.81;
+        const m = this.massKg;
+
+        // Linear accelerations from Newton: a = F/m  (m/s²) → convert to g
+        const a_lin_z = (fz_ref / m - G) / G;   // subtract gravity, normalise
+        const a_lin_y =  fy_ref / (m * G);
+        const a_lin_x =  fx_ref / (m * G);
+
+        // Simulate body pitch (~10–15° forward lean during walking)
+        // and roll oscillation during gait
+        const phase = (cycleProgress / this.cycleLen) * 2 * Math.PI;
+        const pitch = (12 * Math.PI / 180) + (3 * Math.PI / 180) * Math.sin(phase);
+        const roll  = (4  * Math.PI / 180) * Math.sin(phase + Math.PI / 4);
+
+        // Gravity projection onto sensor axes (sensor tilted by pitch/roll)
+        const g_x_sensor = -Math.sin(pitch);
+        const g_y_sensor =  Math.sin(roll) * Math.cos(pitch);
+        const g_z_sensor =  Math.cos(roll) * Math.cos(pitch);
+
+        // Raw accelerometer reading = linear accel + gravity (in sensor frame)
+        const ax_clean = a_lin_x + g_x_sensor;
+        const ay_clean = a_lin_y + g_y_sensor;
+        const az_clean = a_lin_z + g_z_sensor;
+
+        // Angular rates: derivative of pitch/roll + small yaw
+        const dPhase = (2 * Math.PI / this.cycleLen);   // rad per sample
+        const gy_clean =  (3 * Math.PI / 180) * Math.cos(phase) * dPhase
+                          / (1 / this.sampleRate) * (180 / Math.PI);  // deg/s
+        const gx_clean = -(4 * Math.PI / 180) * Math.cos(phase + Math.PI / 4)
+                          * dPhase / (1 / this.sampleRate) * (180 / Math.PI);
+        const gz_clean = 8 * Math.sin(phase);   // small yaw oscillation (deg/s)
+
+        // Sensor noise levels (MPU-6050 datasheet typical)
+        const accNoise = 0.004;   // g  RMS
+        const gyrNoise = 0.5;     // deg/s RMS
+        const rng = () => (Math.random() - 0.5) * 2;  // uniform [-1,1]
+
+        return {
+            ax: ax_clean + rng() * accNoise * 3,
+            ay: ay_clean + rng() * accNoise * 3,
+            az: az_clean + rng() * accNoise * 3,
+            gx: gx_clean + rng() * gyrNoise * 3,
+            gy: gy_clean + rng() * gyrNoise * 3,
+            gz: gz_clean + rng() * gyrNoise * 3,
+        };
+    }
+
+    /* ── Main sample generator ───────────────────────────────────────────── */
+
+    /**
+     * Returns one gait sample at 100 Hz.
+     * @returns {{
+     *   imu: { ax,ay,az,gx,gy,gz },   ← pipe through ImuProcessor
+     *   ref: { fz,fy,fx }             ← force-plate ground truth (sim only)
+     * }}
+     */
     nextSample() {
-        const cycleProgress = this.t % this.cycleLength;
-        
-        let refValue = 0;
-        let rawValue = 0;
-        let adaptValue = 0;
+        const cycleProgress = this.t % this.cycleLen;
+        let ref_fz = 0, ref_fy = 0, ref_fx = 0;
+        let imu;
 
-        if (cycleProgress < this.stanceDuration) {
-            // Stance phase
-            const stanceProgress = cycleProgress / this.stanceDuration;
-            refValue = this.generateStanceCurve(stanceProgress);
-            
-            // Add some high frequency noise to reference
-            refValue += (Math.random() - 0.5) * 15;
+        if (cycleProgress < this.stanceSamples) {
+            const progress = cycleProgress / this.stanceSamples;
+            ref_fz = this._refFz(progress) + (Math.random() - 0.5) * 15;
+            ref_fy = this._refFy(progress) + (Math.random() - 0.5) * 8;
+            ref_fx = this._refFx(progress) + (Math.random() - 0.5) * 5;
 
-            // Raw model tends to smooth out and underestimate peaks (the "peak-load problem")
-            // We'll apply a scaling factor and lower the peak, simulating the RMSE
-            const rawScale = 1 - (this.rawPeakError / 850); 
-            rawValue = refValue * rawScale;
-            // Add some modeling error (smoother, lags a bit, or just random noise)
-            rawValue += Math.sin(stanceProgress * Math.PI) * 20 + (Math.random() - 0.5) * 10;
-
-            // Adapted model is an affine transform: a*raw + b
-            // We simulate this by making it much closer to reference
-            const adaptScale = 1 - (this.adaptPeakError / 850);
-            adaptValue = refValue * adaptScale;
-            // Adapted has less error
-            adaptValue += (Math.random() - 0.5) * 8;
-            
+            imu = this._forceToImu(ref_fz, ref_fy, ref_fx, progress, cycleProgress);
         } else {
-            // Swing phase (noise floor)
-            refValue = Math.random() * 5;
-            rawValue = Math.random() * 8;
-            adaptValue = Math.random() * 6;
-            
-            if (cycleProgress === this.cycleLength - 1) {
-                this.currentStep++;
-            }
+            // Swing phase: sensor hanging free, small vibration
+            ref_fz = Math.random() * 5;
+            ref_fy = (Math.random() - 0.5) * 10;
+            ref_fx = (Math.random() - 0.5) * 5;
+
+            imu = {
+                ax: (Math.random() - 0.5) * 0.05,
+                ay: (Math.random() - 0.5) * 0.08,
+                az: 1.0 + (Math.random() - 0.5) * 0.03,
+                gx: (Math.random() - 0.5) * 10,
+                gy: (Math.random() - 0.5) * 15,
+                gz: (Math.random() - 0.5) * 8,
+            };
         }
 
         this.t++;
-        
         return {
-            time: (this.t / this.sampleRate).toFixed(2),
-            reference: Math.max(0, refValue),
-            raw: Math.max(0, rawValue),
-            adapted: Math.max(0, adaptValue)
+            time: ((this.t / this.sampleRate)).toFixed(2),
+            imu,
+            ref: {
+                fz: Math.max(0, ref_fz),
+                fy: ref_fy,
+                fx: ref_fx,
+            }
         };
     }
 }

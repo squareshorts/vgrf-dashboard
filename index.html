@@ -3,59 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>vGRF Live Diagnostics - Practitioner Dashboard</title>
-    <!-- Google Fonts -->
+    <title>vGRF Live Diagnostics — Multi-Component GRF Monitor</title>
+    <meta name="description" content="Real-time three-component ground reaction force monitoring from IMU sensor data via Raspberry Pi WiFi stream.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <!-- Custom CSS -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="dashboard-container">
-        <!-- Sidebar / Navigation -->
+
+        <!-- ═══════════════ SIDEBAR ═══════════════ -->
         <aside class="sidebar glass-panel">
+
+            <!-- Logo -->
             <div class="logo">
-                <div class="icon"></div>
-                <h2>vGRF<br><span>Live Diagnostics</span></h2>
-            </div>
-            
-            <div class="patient-card">
-                <h3>Current Patient</h3>
-                <div class="patient-info">
-                    <p><strong>ID:</strong> P08 (Held-out)</p>
-                    <p><strong>Age:</strong> 28</p>
-                    <p><strong>Condition:</strong> Healthy Adult</p>
-                    <p><strong>Status:</strong> Active Walking</p>
+                <div class="logo-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                </div>
+                <div>
+                    <h2>vGRF <span>Live Diagnostics</span></h2>
+                    <p class="logo-sub">IMU → Force Pipeline</p>
                 </div>
             </div>
 
-            <div class="controls-section">
+            <!-- ── Patient Form ── -->
+            <section class="sidebar-section">
+                <h3>Patient Information</h3>
+                <div class="form-grid">
+                    <div class="form-row">
+                        <label for="pat-id">Patient ID</label>
+                        <input type="text" id="pat-id" placeholder="e.g. P09" maxlength="12">
+                    </div>
+                    <div class="form-row form-row--half">
+                        <div>
+                            <label for="pat-age">Age</label>
+                            <input type="number" id="pat-age" placeholder="28" min="1" max="120">
+                        </div>
+                        <div>
+                            <label for="pat-sex">Sex</label>
+                            <select id="pat-sex">
+                                <option value="">—</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="pat-weight">Body Weight (kg)  <span class="label-hint">— used for F = m·a</span></label>
+                        <input type="number" id="pat-weight" placeholder="70" min="10" max="300" step="0.5" value="70">
+                    </div>
+                    <div class="form-row">
+                        <label for="pat-condition">Condition</label>
+                        <select id="pat-condition">
+                            <option value="healthy">Healthy Adult</option>
+                            <option value="parkinsons">Parkinson's Disease</option>
+                            <option value="stroke">Stroke / Hemiplegia</option>
+                            <option value="osteoarthritis">Osteoarthritis</option>
+                            <option value="prosthesis">Prosthesis User</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label for="pat-status">Status</label>
+                        <select id="pat-status">
+                            <option value="walking">Active Walking</option>
+                            <option value="trotting">Trotting</option>
+                            <option value="running">Running</option>
+                            <option value="standing">Standing</option>
+                            <option value="stairs-up">Stairs — Ascending</option>
+                            <option value="stairs-down">Stairs — Descending</option>
+                            <option value="custom">Custom Task</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── Data Source ── -->
+            <section class="sidebar-section">
                 <h3>Data Source</h3>
-                <div class="control-group">
-                    <label for="data-source">Source Type:</label>
+                <div class="form-row">
+                    <label for="data-source">Source Type</label>
                     <select id="data-source">
-                        <option value="simulator" selected>Synthetic Simulator</option>
+                        <option value="simulator">Synthetic Simulator</option>
+                        <option value="websocket" selected>Raspberry Pi (WiFi)</option>
                         <option value="bluetooth">Bluetooth BLE (IMU)</option>
                         <option value="serial">Web Serial (USB/COM)</option>
-                        <option value="websocket">WebSocket Stream (Port 8765)</option>
                     </select>
                 </div>
-                <div class="control-group" id="ble-settings" style="display: none;">
+
+                <!-- WiFi / WebSocket -->
+                <div id="ws-settings" class="source-panel">
+                    <button id="btn-connect-ws" class="btn-primary" data-connected="false">
+                        Connect to Raspberry Pi
+                    </button>
+                    <span class="status-badge disconnected" id="ws-status">Disconnected</span>
+                </div>
+
+                <!-- Bluetooth BLE -->
+                <div id="ble-settings" class="source-panel" style="display:none">
                     <button id="btn-connect-ble" class="btn-primary">Connect Bluetooth BLE</button>
                 </div>
-                <div class="control-group" id="serial-settings" style="display: none;">
+
+                <!-- Web Serial -->
+                <div id="serial-settings" class="source-panel" style="display:none">
                     <button id="btn-connect-serial" class="btn-primary">Connect USB Sensor</button>
                 </div>
-                <div class="control-group" id="ws-settings" style="display: none;">
-                    <span class="status-badge" id="ws-status">Disconnected</span>
-                </div>
-            </div>
+            </section>
 
-            <div class="controls-section">
+            <!-- ── Adaptation Settings ── -->
+            <section class="sidebar-section">
                 <h3>Adaptation Settings</h3>
-                <div class="control-group">
-                    <label for="calibration-budget">Calibration Steps:</label>
+                <div class="form-row">
+                    <label for="calibration-budget">Calibration Steps</label>
                     <select id="calibration-budget">
                         <option value="5">5 Steps</option>
                         <option value="10">10 Steps</option>
@@ -63,67 +126,162 @@
                         <option value="50">50 Steps</option>
                     </select>
                 </div>
-                <div class="control-group">
-                    <label for="global-backbone">Global Backbone:</label>
+                <div class="form-row">
+                    <label for="global-backbone">Global Backbone</label>
                     <select id="global-backbone">
                         <option value="rf">Random Forest</option>
                         <option value="gru">GRU</option>
                         <option value="itransformer">iTransformer</option>
                     </select>
                 </div>
-            </div>
+            </section>
 
-            <div class="metrics-summary">
+            <!-- ── Live Metrics (tabbed) ── -->
+            <section class="sidebar-section metrics-section">
                 <h3>Live Metrics</h3>
-                <div class="metric-box warning">
-                    <span class="metric-label">Peak RMSE (Raw Global)</span>
-                    <span class="metric-value" id="val-raw-rmse">177.8 N</span>
-                </div>
-                <div class="metric-box success">
-                    <span class="metric-label">Peak RMSE (Adapted)</span>
-                    <span class="metric-value" id="val-adapt-rmse">58.1 N</span>
-                </div>
-                <div class="metric-box info">
-                    <span class="metric-label">Peak Bias (Adapted)</span>
-                    <span class="metric-value" id="val-bias">-2.4 N</span>
-                </div>
-            </div>
-        </aside>
 
-        <!-- Main Content Area -->
-        <main class="main-content">
-            <header class="top-header glass-panel">
-                <div class="header-title">
-                    <h1>Real-Time vGRF Monitoring</h1>
-                    <p>Calibration-Light Subject Adaptation in Single-Sensor Estimation</p>
+                <!-- Tab bar -->
+                <div class="metric-tabs" role="tablist">
+                    <button class="tab-btn active" data-tab="fz" role="tab" id="tab-fz"
+                            aria-selected="true" aria-controls="metrics-fz">Fz</button>
+                    <button class="tab-btn" data-tab="fy" role="tab" id="tab-fy"
+                            aria-selected="false" aria-controls="metrics-fy">Fy</button>
+                    <button class="tab-btn" data-tab="fx" role="tab" id="tab-fx"
+                            aria-selected="false" aria-controls="metrics-fx">Fx</button>
                 </div>
-                <div class="status-indicator">
-                    <span class="dot pulse"></span>
-                    <span class="status-text">Receiving Sensor Data (100 Hz)</span>
-                </div>
-            </header>
 
-            <section class="charts-container">
-                <div class="chart-wrapper glass-panel">
-                    <div class="chart-header">
-                        <h2>Vertical Ground Reaction Force (vGRF) Trajectory</h2>
-                        <div class="legend-custom">
-                            <span class="legend-item"><span class="color-box ref"></span> Reference (Force Plate)</span>
-                            <span class="legend-item"><span class="color-box raw"></span> Raw Global Model</span>
-                            <span class="legend-item"><span class="color-box adapt"></span> Adapted Model</span>
-                        </div>
+                <!-- Fz metrics -->
+                <div class="metric-panel" id="metrics-fz" role="tabpanel" aria-labelledby="tab-fz">
+                    <div class="metric-box warning">
+                        <span class="metric-label">Peak RMSE — Raw IMU</span>
+                        <span class="metric-value" id="val-fz-raw-rmse">— N</span>
                     </div>
-                    <div class="canvas-container">
-                        <canvas id="vgrfChart"></canvas>
+                    <div class="metric-box success">
+                        <span class="metric-label">Peak RMSE — Adapted</span>
+                        <span class="metric-value" id="val-fz-adapt-rmse">— N</span>
+                    </div>
+                    <div class="metric-box info">
+                        <span class="metric-label">Peak Bias — Adapted</span>
+                        <span class="metric-value" id="val-fz-bias">— N</span>
+                    </div>
+                </div>
+
+                <!-- Fy metrics -->
+                <div class="metric-panel hidden" id="metrics-fy" role="tabpanel" aria-labelledby="tab-fy">
+                    <div class="metric-box fy-raw">
+                        <span class="metric-label">Peak RMSE — Raw IMU</span>
+                        <span class="metric-value" id="val-fy-raw-rmse">— N</span>
+                    </div>
+                    <div class="metric-box fy-adapt">
+                        <span class="metric-label">Peak RMSE — Adapted</span>
+                        <span class="metric-value" id="val-fy-adapt-rmse">— N</span>
+                    </div>
+                    <div class="metric-box info">
+                        <span class="metric-label">Peak Bias — Adapted</span>
+                        <span class="metric-value" id="val-fy-bias">— N</span>
+                    </div>
+                </div>
+
+                <!-- Fx metrics -->
+                <div class="metric-panel hidden" id="metrics-fx" role="tabpanel" aria-labelledby="tab-fx">
+                    <div class="metric-box fx-raw">
+                        <span class="metric-label">Peak RMSE — Raw IMU</span>
+                        <span class="metric-value" id="val-fx-raw-rmse">— N</span>
+                    </div>
+                    <div class="metric-box fx-adapt">
+                        <span class="metric-label">Peak RMSE — Adapted</span>
+                        <span class="metric-value" id="val-fx-adapt-rmse">— N</span>
+                    </div>
+                    <div class="metric-box info">
+                        <span class="metric-label">Peak Bias — Adapted</span>
+                        <span class="metric-value" id="val-fx-bias">— N</span>
                     </div>
                 </div>
             </section>
-        </main>
-    </div>
 
-    <!-- Chart.js -->
+        </aside><!-- /sidebar -->
+
+        <!-- ═══════════════ MAIN CONTENT ═══════════════ -->
+        <main class="main-content">
+
+            <!-- Header -->
+            <header class="top-header glass-panel">
+                <div class="header-title">
+                    <h1>Ground Reaction Force Monitoring</h1>
+                    <p id="header-subtitle">Calibration-Light Subject Adaptation — MPU-6050 WiFi Pipeline</p>
+                </div>
+                <div class="header-right">
+                    <div class="legend-row">
+                        <span class="legend-dot" style="background:#fff"></span><span>Reference</span>
+                        <span class="legend-dot raw-dot"></span><span>Raw IMU</span>
+                        <span class="legend-dot adapt-dot"></span><span>Adapted</span>
+                    </div>
+                    <div class="status-indicator">
+                        <span class="dot pulse" id="status-dot"></span>
+                        <span class="status-text" id="status-text">Simulator Active</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Three charts stacked -->
+            <section class="charts-container">
+
+                <!-- Fz -->
+                <div class="chart-panel glass-panel">
+                    <div class="chart-panel-header">
+                        <span class="component-label fz-label">Fz</span>
+                        <span class="component-title">Vertical GRF</span>
+                        <div class="chart-legend">
+                            <span><span class="swatch" style="background:#fff"></span>Reference</span>
+                            <span><span class="swatch" style="background:#f43f5e"></span>Raw IMU</span>
+                            <span><span class="swatch" style="background:#10b981"></span>Adapted</span>
+                        </div>
+                    </div>
+                    <div class="canvas-wrap">
+                        <canvas id="fzChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Fy -->
+                <div class="chart-panel glass-panel">
+                    <div class="chart-panel-header">
+                        <span class="component-label fy-label">Fy</span>
+                        <span class="component-title">Anterior-Posterior</span>
+                        <div class="chart-legend">
+                            <span><span class="swatch" style="background:#fff"></span>Reference</span>
+                            <span><span class="swatch" style="background:#f97316"></span>Raw IMU</span>
+                            <span><span class="swatch" style="background:#38bdf8"></span>Adapted</span>
+                        </div>
+                    </div>
+                    <div class="canvas-wrap">
+                        <canvas id="fyChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Fx -->
+                <div class="chart-panel glass-panel">
+                    <div class="chart-panel-header">
+                        <span class="component-label fx-label">Fx</span>
+                        <span class="component-title">Medio-Lateral</span>
+                        <div class="chart-legend">
+                            <span><span class="swatch" style="background:#fff"></span>Reference</span>
+                            <span><span class="swatch" style="background:#a78bfa"></span>Raw IMU</span>
+                            <span><span class="swatch" style="background:#fbbf24"></span>Adapted</span>
+                        </div>
+                    </div>
+                    <div class="canvas-wrap">
+                        <canvas id="fxChart"></canvas>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+
+    </div><!-- /dashboard-container -->
+
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- App Scripts -->
+    <script src="dsp.js"></script>
     <script src="simulator.js"></script>
     <script src="chartManager.js"></script>
     <script src="ui.js"></script>
