@@ -144,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Common transparent serial UART UUIDs (Nordic NUS, HM-10, ESP32 custom BLE)
             const serviceUUIDs = [
                 '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART Service
-                'ffe0',                                 // HM-10 / CC2541 Serial
+                '0000ffe0-0000-1000-8000-00805f9b34fb', // HM-10 / CC2541 Serial
                 '19b10000-e8f2-537e-4f6c-d104768a1214'  // Custom Arduino BLE
             ];
 
